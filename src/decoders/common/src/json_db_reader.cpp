@@ -159,6 +159,13 @@ void ParseBaseField(element j_, BaseField& f_)
         else { f_.SetConversion(std::string(AsStringView(conversionString))); }
     }
 
+    element defaultValue;
+    double dDefaultValue;
+    if (j_["defaultValue"].get(defaultValue) == simdjson::SUCCESS && defaultValue.get(dDefaultValue) == simdjson::SUCCESS)
+    {
+        f_.defaultValue = dDefaultValue;
+    }
+
     ParseSimpleDataType(Member(j_, "dataType"), f_.dataType);
 }
 

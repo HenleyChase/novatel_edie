@@ -313,6 +313,7 @@ struct BaseField
     bool isCsv{false};                // cached; Ascii encoding of this field is comma-separated,
                                       // true for arrays which are not strings and do not use the %Z or %P conversion strings
     SimpleDataType dataType;
+    std::optional<double> defaultValue; // value assumed by the receiver when this parameter is omitted from a command
     size_t index{0}; // if fixed, this is the byte offset of the field in CompositeField.fixedFields
                      // if variable, this is the index of the field in CompositeField.variableFields
 
