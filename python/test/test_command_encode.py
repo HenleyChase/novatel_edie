@@ -63,9 +63,18 @@ def test_command_encode_binary_configcode(commander):
     assert encoded_command == expected_command
 
 def test_command_encode_binary_log_partial(commander):
+    # Omitted trailing parameters take their database defaults
     command_to_encode = b"LOG THISPORT BESTPOSA ONCE\r\n"
-    with pytest.raises(ne.MalformedInputException):
-        commander.encode(command_to_encode, ENCODE_FORMAT.BINARY)
+    expected_command = commander.encode(b"LOG THISPORT BESTPOSA ONCE 0 0 NOHOLD", ENCODE_FORMAT.BINARY)
+    assert commander.encode(command_to_encode, ENCODE_FORMAT.BINARY) == expected_command
+
+def test_command_encode_ascii_no_parameters(commander):
+    expected_command = b"#UNLOGALLA,THISPORT,0,0.0,UNKNOWN,0,0.000,00000000,3629,0;ALL_PORTS,FALSE*95b8f454\r\n"
+    assert commander.encode(b"UNLOGALL", ENCODE_FORMAT.ASCII) == expected_command
+
+def test_command_encode_ascii_omitted_port(commander):
+    expected_command = b"#LOGA,THISPORT,0,0.0,UNKNOWN,0,0.000,00000000,92b2,0;THISPORT,BESTXYZA,ONTIME,1.000000,0.000000,NOHOLD*80267f12\r\n"
+    assert commander.encode(b"log bestxyza ontime 1", ENCODE_FORMAT.ASCII) == expected_command
 
 def test_command_encode_binary_ualcontrol(commander):
     expected_command = bytes([0xAA, 0x44, 0x12, 0x1C, 0x5B, 0x06, 0x00, 0xC0, 0x14, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xA3, 0x49, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x40, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xF0, 0x3F, 0xFF, 0xF8, 0x3A, 0xA7])

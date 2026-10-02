@@ -3513,8 +3513,20 @@ TEST_F(CommandEncodeTest, COMMAND_ENCODE_BINARY_CONFIGCODE)
 
 TEST_F(CommandEncodeTest, COMMAND_ENCODE_BINARY_LOG_PARTIAL)
 {
+    // Omitted trailing parameters take their database defaults (on_time 0, offset 0, NOHOLD)
+    unsigned char aucExpectedCommand[MAX_ASCII_MESSAGE_LENGTH];
     char acEncodeBuffer[MAX_ASCII_MESSAGE_LENGTH];
-    ASSERT_EQ(STATUS::MALFORMED_INPUT, TestCommandConversion("LOG THISPORT BESTPOSA ONCE\r\n", acEncodeBuffer, sizeof(acEncodeBuffer), ENCODE_FORMAT::BINARY));
+    uint32_t uiExpectedLength = 0;
+    {
+        char acFull[MAX_ASCII_MESSAGE_LENGTH];
+        uiExpectedLength = sizeof(acFull);
+        const std::string sFull = "LOG THISPORT BESTPOSA ONCE 0 0 NOHOLD";
+        ASSERT_EQ(STATUS::SUCCESS, pclMyCommander->Encode(sFull.c_str(), static_cast<uint32_t>(sFull.size()), acFull, uiExpectedLength, ENCODE_FORMAT::BINARY));
+        memcpy(aucExpectedCommand, acFull, uiExpectedLength);
+    }
+
+    ASSERT_EQ(STATUS::SUCCESS, TestCommandConversion("LOG THISPORT BESTPOSA ONCE\r\n", acEncodeBuffer, sizeof(acEncodeBuffer), ENCODE_FORMAT::BINARY));
+    ASSERT_EQ(0, memcmp(acEncodeBuffer, aucExpectedCommand, uiExpectedLength));
 }
 
 TEST_F(CommandEncodeTest, COMMAND_ENCODE_BINARY_UALCONTROL)
@@ -3524,6 +3536,73 @@ TEST_F(CommandEncodeTest, COMMAND_ENCODE_BINARY_UALCONTROL)
 
     ASSERT_EQ(STATUS::SUCCESS, TestCommandConversion("UALCONTROL ENABLE 2.0 1.0", acEncodeBuffer, sizeof(aucExpectedCommand), ENCODE_FORMAT::BINARY));
     ASSERT_EQ(0, memcmp(acEncodeBuffer, aucExpectedCommand, sizeof(aucExpectedCommand)));
+}
+
+// -------------------------------------------------------------------------------------------------------
+// Abbreviated to Full ASCII Command Conversion Unit Tests
+// -------------------------------------------------------------------------------------------------------
+static std::string EncodeAsciiCommand(Commander& clCommander_, const std::string& sCommand_, STATUS& eStatus_)
+{
+    char acEncodeBuffer[MAX_ASCII_MESSAGE_LENGTH];
+    uint32_t uiLength = sizeof(acEncodeBuffer);
+    eStatus_ = clCommander_.Encode(sCommand_.c_str(), static_cast<uint32_t>(sCommand_.size()), acEncodeBuffer, uiLength, ENCODE_FORMAT::ASCII);
+    return eStatus_ == STATUS::SUCCESS ? std::string(acEncodeBuffer, uiLength) : std::string();
+}
+
+TEST_F(CommandEncodeTest, COMMAND_ENCODE_ASCII_NO_PARAMETERS)
+{
+    STATUS eStatus;
+    ASSERT_EQ("#UNLOGALLA,THISPORT,0,0.0,UNKNOWN,0,0.000,00000000,3629,0;ALL_PORTS,FALSE*95b8f454\r\n",
+              EncodeAsciiCommand(*pclMyCommander, "UNLOGALL", eStatus));
+    ASSERT_EQ("#FRESETA,THISPORT,0,0.0,UNKNOWN,0,0.000,00000000,d2d7,0;STANDARD*5c920d6a\r\n", EncodeAsciiCommand(*pclMyCommander, "FRESET", eStatus));
+    ASSERT_EQ("#SAVECONFIGA,THISPORT,0,0.0,UNKNOWN,0,0.000,00000000,a83d,0*fc543efc\r\n", EncodeAsciiCommand(*pclMyCommander, "SAVECONFIG", eStatus));
+}
+
+TEST_F(CommandEncodeTest, COMMAND_ENCODE_ASCII_TRAILING_DEFAULTS)
+{
+    STATUS eStatus;
+    ASSERT_EQ("#UNLOGALLA,THISPORT,0,0.0,UNKNOWN,0,0.000,00000000,3629,0;COM1,FALSE*02be1957\r\n",
+              EncodeAsciiCommand(*pclMyCommander, "UNLOGALL COM1", eStatus));
+    ASSERT_EQ("#UNLOGALLA,THISPORT,0,0.0,UNKNOWN,0,0.000,00000000,3629,0;COM1,TRUE*582ec3f2\r\n",
+              EncodeAsciiCommand(*pclMyCommander, "UNLOGALL COM1 TRUE", eStatus));
+    ASSERT_EQ("#LOGA,THISPORT,0,0.0,UNKNOWN,0,0.000,00000000,92b2,0;COM1,BESTXYZA,ONTIME,1.000000,0.000000,NOHOLD*96044f31\r\n",
+              EncodeAsciiCommand(*pclMyCommander, "LOG COM1 BESTXYZA ONTIME 1", eStatus));
+}
+
+TEST_F(CommandEncodeTest, COMMAND_ENCODE_ASCII_OMITTED_PORT)
+{
+    STATUS eStatus;
+    const std::string sExpected = "#LOGA,THISPORT,0,0.0,UNKNOWN,0,0.000,00000000,92b2,0;THISPORT,BESTXYZA,ONTIME,1.000000,0.000000,NOHOLD*80267f12\r\n";
+    ASSERT_EQ(sExpected, EncodeAsciiCommand(*pclMyCommander, "LOG BESTXYZA ONTIME 1", eStatus));
+    ASSERT_EQ(sExpected, EncodeAsciiCommand(*pclMyCommander, "LOG THISPORT BESTXYZA ONTIME 1", eStatus));
+}
+
+TEST_F(CommandEncodeTest, COMMAND_ENCODE_ASCII_CASE_INSENSITIVE)
+{
+    STATUS eStatus;
+    ASSERT_EQ(EncodeAsciiCommand(*pclMyCommander, "LOG BESTXYZA ONTIME 1", eStatus), EncodeAsciiCommand(*pclMyCommander, "log bestxyza ontime 1", eStatus));
+    ASSERT_EQ(STATUS::SUCCESS, eStatus);
+}
+
+TEST_F(CommandEncodeTest, COMMAND_ENCODE_ASCII_QUOTED_SPACES)
+{
+    STATUS eStatus;
+    const std::string sEncoded = EncodeAsciiCommand(*pclMyCommander, "CONFIGCODE ERASE_TABLE \"WJ4 HDW\" \"GM5Z99\" \"T2M7DP\" \"KG2T8T\" \"KF7GKR\" \"TABLECLEAR\"", eStatus);
+    ASSERT_EQ(STATUS::SUCCESS, eStatus);
+    ASSERT_NE(std::string::npos, sEncoded.find(";ERASE_TABLE,\"WJ4 HDW\",\"GM5Z99\""));
+}
+
+TEST_F(CommandEncodeTest, COMMAND_ENCODE_ASCII_INVALID)
+{
+    STATUS eStatus;
+    EncodeAsciiCommand(*pclMyCommander, "LOG", eStatus); // Message to log is required
+    ASSERT_EQ(STATUS::MALFORMED_INPUT, eStatus);
+    EncodeAsciiCommand(*pclMyCommander, "UNLOGALL COM1 TRUE EXTRA", eStatus);
+    ASSERT_EQ(STATUS::MALFORMED_INPUT, eStatus);
+    EncodeAsciiCommand(*pclMyCommander, "NOTACOMMAND", eStatus);
+    ASSERT_EQ(STATUS::NO_DEFINITION, eStatus);
+    EncodeAsciiCommand(*pclMyCommander, "", eStatus);
+    ASSERT_EQ(STATUS::MALFORMED_INPUT, eStatus);
 }
 
 // -------------------------------------------------------------------------------------------------------
