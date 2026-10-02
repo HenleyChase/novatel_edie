@@ -4393,3 +4393,43 @@ TEST_F(NovatelTypesTest, ASCII_GPSTIME_MSEC_VALID)
 }
 
 // TODO: Add tests for OEM Message Decoder Quirks that aren't covered by the common tests
+
+// -------------------------------------------------------------------------------------------------------
+// Command responses to JSON
+// -------------------------------------------------------------------------------------------------------
+static std::vector<std::string> ParseToJson(const std::string& sData_, bool bIgnoreAbbreviatedAsciiResponses_)
+{
+    Parser clParser(LoadJsonDbFile(std::getenv("TEST_DATABASE_PATH")));
+    clParser.SetEncodeFormat(ENCODE_FORMAT::JSON);
+    clParser.SetIgnoreAbbreviatedAsciiResponses(bIgnoreAbbreviatedAsciiResponses_);
+    EXPECT_EQ(sData_.size(), clParser.Write(reinterpret_cast<const unsigned char*>(sData_.data()), sData_.size()));
+
+    std::vector<std::string> vJson;
+    MessageDataStruct stMessageData;
+    MetaDataStruct stMetaData;
+    while (clParser.Read(stMessageData, stMetaData, true) == STATUS::SUCCESS)
+    {
+        vJson.emplace_back(reinterpret_cast<const char*>(stMessageData.pucMessage), stMessageData.uiMessageLength);
+    }
+    return vJson;
+}
+
+TEST_F(ParserTest, RESPONSES_TO_JSON)
+{
+    const std::string sData = "#FRESETR,COM1,0,73.0,UNKNOWN,0,0.000,00000000,06e5,0;OK*55c70910\r\n"
+                              "<OK\r\n"
+                              "<ERROR:Invalid Message ID\r\n"
+                              "#BESTXYZA,COM1,0,55.0,FINESTEERING,2209,502061.000,02000000,d821,16809;SOL_COMPUTED,NARROW_INT,-1634531.5683,-3664618.0326,4942496.3270,0.0099,0.0219,0.0115,SOL_COMPUTED,NARROW_INT,0.0011,-0.0049,-0.0001,0.0199,0.0439,0.0230,\"AAAA\",0.250,1.000,0.000,12,11,11,11,0,01,0,33*cae1b125\r\n";
+
+    std::vector<std::string> vJson = ParseToJson(sData, false);
+    ASSERT_EQ(4U, vJson.size());
+    ASSERT_NE(std::string::npos, vJson[0].find(R"("message": "FRESET")"));
+    ASSERT_NE(std::string::npos, vJson[0].find(R"("body": {"response_id": 1,"response_str": "OK"})"));
+    ASSERT_NE(std::string::npos, vJson[1].find(R"("body": {"response_id": 1,"response_str": "OK"})"));
+    ASSERT_NE(std::string::npos, vJson[2].find(R"("response_str": "ERROR:Invalid Message ID")"));
+    ASSERT_NE(std::string::npos, vJson[3].find(R"("message": "BESTXYZ")"));
+
+    // Abbreviated responses are skipped by default
+    vJson = ParseToJson(sData, true);
+    ASSERT_EQ(2U, vJson.size());
+}
