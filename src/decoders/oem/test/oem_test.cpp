@@ -3515,6 +3515,77 @@ TEST_F(CommandEncodeTest, COMMAND_ENCODE_ASCII_INSTHRESHOLDS)
     ASSERT_EQ(0, memcmp(acEncodeBuffer, aucExpectedCommand, sizeof(aucExpectedCommand)));
 }
 
+TEST_F(CommandEncodeTest, COMMAND_ENCODE_ASCII_LOG_DEFAULT_PORT)
+{
+    char aucExpectedCommand[] = "#LOGA,THISPORT,0,0.0,UNKNOWN,0,0.000,00000000,92b2,0;THISPORT,RXCONFIGA,ONCE,0.000000,0.000000,NOHOLD*001a9805\r\n";
+    char acEncodeBuffer[MAX_ASCII_MESSAGE_LENGTH];
+
+    ASSERT_EQ(STATUS::SUCCESS, TestCommandConversion("LOG RXCONFIGA ONCE", acEncodeBuffer, sizeof(aucExpectedCommand), ENCODE_FORMAT::ASCII));
+    ASSERT_EQ(0, memcmp(acEncodeBuffer, aucExpectedCommand, sizeof(aucExpectedCommand)));
+}
+
+TEST_F(CommandEncodeTest, COMMAND_ENCODE_ASCII_LOG_DEFAULT_TRAILING)
+{
+    char aucExpectedCommand[] = "#LOGA,THISPORT,0,0.0,UNKNOWN,0,0.000,00000000,92b2,0;COM1_2,IONUTCA,ONCHANGED,0.000000,0.000000,NOHOLD*40242024\r\n";
+    char acEncodeBuffer[MAX_ASCII_MESSAGE_LENGTH];
+
+    ASSERT_EQ(STATUS::SUCCESS, TestCommandConversion("LOG COM1_2 IONUTCA ONCHANGED", acEncodeBuffer, sizeof(aucExpectedCommand), ENCODE_FORMAT::ASCII));
+    ASSERT_EQ(0, memcmp(acEncodeBuffer, aucExpectedCommand, sizeof(aucExpectedCommand)));
+}
+
+TEST_F(CommandEncodeTest, COMMAND_ENCODE_ASCII_UNLOGALL_NO_PARAMETERS)
+{
+    char aucExpectedCommand[] = "#UNLOGALLA,THISPORT,0,0.0,UNKNOWN,0,0.000,00000000,3629,0;ALL_PORTS,FALSE*95b8f454\r\n";
+    char acEncodeBuffer[MAX_ASCII_MESSAGE_LENGTH];
+
+    ASSERT_EQ(STATUS::SUCCESS, TestCommandConversion("UNLOGALL", acEncodeBuffer, sizeof(aucExpectedCommand), ENCODE_FORMAT::ASCII));
+    ASSERT_EQ(0, memcmp(acEncodeBuffer, aucExpectedCommand, sizeof(aucExpectedCommand)));
+}
+
+TEST_F(CommandEncodeTest, COMMAND_ENCODE_ASCII_ECHO_DEFAULT_PORT)
+{
+    char aucExpectedCommand[] = "#ECHOA,THISPORT,0,0.0,UNKNOWN,0,0.000,00000000,f3ea,0;THISPORT,ON*9162d7c1\r\n";
+    char acEncodeBuffer[MAX_ASCII_MESSAGE_LENGTH];
+
+    ASSERT_EQ(STATUS::SUCCESS, TestCommandConversion("ECHO ON", acEncodeBuffer, sizeof(aucExpectedCommand), ENCODE_FORMAT::ASCII));
+    ASSERT_EQ(0, memcmp(acEncodeBuffer, aucExpectedCommand, sizeof(aucExpectedCommand)));
+}
+
+TEST_F(CommandEncodeTest, COMMAND_ENCODE_ASCII_UNKNOWN_ENUM)
+{
+    char acEncodeBuffer[MAX_ASCII_MESSAGE_LENGTH];
+    ASSERT_EQ(STATUS::MALFORMED_INPUT, TestCommandConversion("ECHO CM1 ON", acEncodeBuffer, sizeof(acEncodeBuffer), ENCODE_FORMAT::ASCII));
+}
+
+TEST_F(CommandEncodeTest, COMMAND_ENCODE_ASCII_EXTRA_PARAMETERS)
+{
+    char acEncodeBuffer[MAX_ASCII_MESSAGE_LENGTH];
+    ASSERT_EQ(STATUS::MALFORMED_INPUT, TestCommandConversion("ECHO COM1 ON OFF", acEncodeBuffer, sizeof(acEncodeBuffer), ENCODE_FORMAT::ASCII));
+}
+
+TEST_F(CommandEncodeTest, COMMAND_ENCODE_ASCII_LOG_NO_MESSAGE)
+{
+    char acEncodeBuffer[MAX_ASCII_MESSAGE_LENGTH];
+    ASSERT_EQ(STATUS::MALFORMED_INPUT, TestCommandConversion("LOG", acEncodeBuffer, sizeof(acEncodeBuffer), ENCODE_FORMAT::ASCII));
+    ASSERT_EQ(STATUS::MALFORMED_INPUT, TestCommandConversion("LOG COM1", acEncodeBuffer, sizeof(acEncodeBuffer), ENCODE_FORMAT::ASCII));
+}
+
+TEST_F(CommandEncodeTest, COMMAND_ENCODE_ASCII_UNLOGALL_DEFAULT_PORT)
+{
+    char aucExpectedCommand[] = "#UNLOGALLA,THISPORT,0,0.0,UNKNOWN,0,0.000,00000000,3629,0;ALL_PORTS,TRUE*8c1a48f9\r\n";
+    char acEncodeBuffer[MAX_ASCII_MESSAGE_LENGTH];
+
+    ASSERT_EQ(STATUS::SUCCESS, TestCommandConversion("UNLOGALL TRUE", acEncodeBuffer, sizeof(aucExpectedCommand), ENCODE_FORMAT::ASCII));
+    ASSERT_EQ(0, memcmp(acEncodeBuffer, aucExpectedCommand, sizeof(aucExpectedCommand)));
+}
+
+TEST_F(CommandEncodeTest, COMMAND_ENCODE_ASCII_REQUIRED_LEADING_ENUM)
+{
+    // Only a port can be left off the start, FIX needs its type
+    char acEncodeBuffer[MAX_ASCII_MESSAGE_LENGTH];
+    ASSERT_EQ(STATUS::MALFORMED_INPUT, TestCommandConversion("FIX 51.1 -114.0 1065.0", acEncodeBuffer, sizeof(acEncodeBuffer), ENCODE_FORMAT::ASCII));
+}
+
 // -------------------------------------------------------------------------------------------------------
 // Binary Command Encoding Unit Tests
 // -------------------------------------------------------------------------------------------------------
@@ -3529,8 +3600,11 @@ TEST_F(CommandEncodeTest, COMMAND_ENCODE_BINARY_CONFIGCODE)
 
 TEST_F(CommandEncodeTest, COMMAND_ENCODE_BINARY_LOG_PARTIAL)
 {
+    unsigned char aucExpectedCommand[] = {0xAA, 0x44, 0x12, 0x1C, 0x01, 0x00, 0x00, 0xC0, 0x20, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xB2, 0x92, 0x00, 0x00, 0xC0, 0x00, 0x00, 0x00, 0x2A, 0x00, 0x20, 0x00, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x2F, 0x75, 0x47, 0x68};
     char acEncodeBuffer[MAX_ASCII_MESSAGE_LENGTH];
-    ASSERT_EQ(STATUS::MALFORMED_INPUT, TestCommandConversion("LOG THISPORT BESTPOSA ONCE\r\n", acEncodeBuffer, sizeof(acEncodeBuffer), ENCODE_FORMAT::BINARY));
+
+    ASSERT_EQ(STATUS::SUCCESS, TestCommandConversion("LOG THISPORT BESTPOSA ONCE\r\n", acEncodeBuffer, sizeof(aucExpectedCommand), ENCODE_FORMAT::BINARY));
+    ASSERT_EQ(0, memcmp(acEncodeBuffer, aucExpectedCommand, sizeof(aucExpectedCommand)));
 }
 
 TEST_F(CommandEncodeTest, COMMAND_ENCODE_BINARY_UALCONTROL)

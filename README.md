@@ -246,7 +246,11 @@ use the Commander class to encode a command from
 [Abbreviated ASCII](https://docs.novatel.com/OEM7/Content/Messages/Abbreviated_ASCII.htm) to an
 [ASCII](https://docs.novatel.com/OEM7/Content/Messages/ASCII.htm) or
 [Binary](https://docs.novatel.com/OEM7/Content/Messages/Binary.htm) command.
-Note that all fields, even optional ones, must be provided in the abbreviated ASCII string command.
+
+As on the receiver, optional parameters can be left off the end of the command, and a port can be left off the start.
+These are filled in with their defaults from the database, so `LOG VERSIONA` is encoded as
+`LOG THISPORT VERSIONA ONCE 0 0 NOHOLD`. The database does not say which parameters are optional, so a required
+parameter that is left off the end is also filled in with its default instead of being rejected.
 
 Run the resulting executable with the following command: `command_encoding.exe <path_to_json_db> <output_format> <abbreviated_ascii_command>`
 
